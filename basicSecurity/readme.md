@@ -68,10 +68,10 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
             .formLogin()
             .loginPage("/loginPage")
             .defaultSuccessUrl("/")
-            .failureUrl("/login")
+            .failureUrl("/login.html?error=true")
             .usernameParameter("userId")
             .passwordParameter("passwd")
-            .loginProcessingUrl("/login_proc")
+            .loginProcessingUrl("/login")
             .successHandler((request, response, authentication) -> {
               System.out.println("authentication : " + authentication.getName());
               response.sendRedirect("/");
@@ -121,3 +121,256 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 </div>
 ```
 - 이런 식으로 사용할 수 있음
+
+### 도식화
+![img.png](image/FormLoginImage.png)
+
+- ```UsernamePasswordAuthenticationFitler```
+  - 인증처리에 관련된 필터
+  - 여러 클래스들을 활용해서 인증처리를 수행
+
+- ```AntPathRequestMatcher```
+  - 일치하는 요청(url)이 왔는지 확인
+  - 기본 설정은 '/login'으로 되어 있음
+  - 매칭 되지 않으면 그 다음 필터로 이동 (chain.doFilter)
+  - http.loginProcessingUrl("/login") -> "/login" 바꾸면 변경 가능
+
+- ```Authentication```
+  - 사용자가 입력한 username + password 값을 인증 객체에 저장
+  - 인증 객체를 생성한다는 의미
+
+- ```AuthenticationManager```
+  - 인증 관리자
+  - 인증 객체를 넘겨 받고, 인증 처리를 수행
+  - 내부적으로 ```AuthenticationProvier```클래스 타입의 객체를 가지고 있음
+    - ```AuthenticationManager``` 는 인증 처리를 위임해서 수행
+    - 인증에 실패하면 ```AuthenticationException``` 인증 실패 -> 다시 ```UsernamePasswordAuthenticationFilter```가 받아서 예외에 대한 후속 작업 처리
+    - 인증에 성공하면 Authentication 객체를 만들어 그 안에 인증에 성공한 User객체 또는 권한정보(Authorization)를 넣어줌
+  - ```AuthenticationManager```에게 Return
+    - ```AuthenticationManager```는 ```AuthenticationProvider```에게 받은 최종적인 인증 객체를 다시 Filter(```Authentication```)에게 Return
+
+- ```Authentication```
+  - 최종적으로 성공한 User객체 + 권한정보(Authorities)
+
+- ```SecurityContext```
+  - 여기에 인증 + 인가 정보를 저장
+  - Session에도 저장
+
+- ```SuccessHandler```
+  - 성공하면 이 핸들러(작업)을 수행
+
+### 실습
+#### debug point
+- ```UsernamePasswordAuthenticationFilter```
+  - ```AbstractAuthenticationProcessingFilter``` 부모 필터의 doFilter 수행
+```java
+public abstract class AbstractAuthenticationProcessingFilter extends GenericFilterBean implements ApplicationEventPublisherAware, MessageSourceAware {
+	private void doFilter(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+			throws IOException, ServletException {
+		if (!requiresAuthentication(request, response)) { // 설정한 "/login"과 일치하는지 확인
+			chain.doFilter(request, response); // 일치하지 않으면 다음 필터로
+			return;
+		}
+		try {
+            // 인증을 수행
+			Authentication authenticationResult = attemptAuthentication(request, response);
+			if (authenticationResult == null) {
+				// return immediately as subclass has indicated that it hasn't completed
+				return;
+			}
+			this.sessionStrategy.onAuthentication(authenticationResult, request, response);
+			// Authentication success
+			if (this.continueChainBeforeSuccessfulAuthentication) {
+				chain.doFilter(request, response);
+			}
+			successfulAuthentication(request, response, chain, authenticationResult);
+		}
+		catch (InternalAuthenticationServiceException failed) {
+			this.logger.error("An internal error occurred while trying to authenticate the user.", failed);
+			unsuccessfulAuthentication(request, response, failed);
+		}
+		catch (AuthenticationException ex) {
+			// Authentication failed
+			unsuccessfulAuthentication(request, response, ex);
+		}
+	}
+}
+```
+  - ```attemptAuthentication```는 ```UsernamePasswordAuthenticationFilter```의 메서드로 수행
+```java
+public class UsernamePasswordAuthenticationFilter extends AbstractAuthenticationProcessingFilter {
+
+    @Override
+    public Authentication attemptAuthentication(HttpServletRequest request,
+        HttpServletResponse response)
+        throws AuthenticationException {
+        if (this.postOnly && !request.getMethod().equals("POST")) { // POST로 왔는지 확인
+            throw new AuthenticationServiceException(
+                "Authentication method not supported: " + request.getMethod());
+        }
+        String username = obtainUsername(request); 
+        username = (username != null) ? username : "";
+        username = username.trim();
+        String password = obtainPassword(request);
+        password = (password != null) ? password : "";
+        UsernamePasswordAuthenticationToken authRequest = new UsernamePasswordAuthenticationToken(
+            username, password); // Authentication객체에 username, password를 담아
+        // Allow subclasses to set the "details" property
+        setDetails(request, authRequest);
+        return this.getAuthenticationManager().authenticate(authRequest); // 인증 객체를 AuthenticationManager에 넘김
+    }
+}
+```
+```java
+public class ProviderManager implements AuthenticationManager, MessageSourceAware, InitializingBean {
+
+    @Override
+    public Authentication authenticate(Authentication authentication)
+        throws AuthenticationException {
+        Class<? extends Authentication> toTest = authentication.getClass();
+        AuthenticationException lastException = null;
+        AuthenticationException parentException = null;
+        Authentication result = null;
+        Authentication parentResult = null;
+        int currentPosition = 0;
+        int size = this.providers.size();
+        for (AuthenticationProvider provider : getProviders()) {
+            if (!provider.supports(toTest)) {
+                continue;
+            }
+            if (logger.isTraceEnabled()) {
+                logger.trace(LogMessage.format("Authenticating request with %s (%d/%d)",
+                    provider.getClass().getSimpleName(), ++currentPosition, size));
+            }
+            try {
+                result = provider.authenticate(authentication); // 인증 작업 수행 Provider에게 위임
+                if (result != null) {
+                    copyDetails(authentication, result);
+                    break;
+                }
+            } catch (AccountStatusException | InternalAuthenticationServiceException ex) {
+                prepareException(ex, authentication);
+                throw ex;
+            } catch (AuthenticationException ex) {
+                lastException = ex;
+            }
+        }
+        /* 생략 */
+    }
+}
+```
+  - ```AuthenticationProvider```를 상속한 ```AbstractUserDetailsAuthenticationProvider```에서 authenticate진행
+```java
+public abstract class AbstractUserDetailsAuthenticationProvider
+        implements AuthenticationProvider, InitializingBean, MessageSourceAware {
+
+    @Override
+    public Authentication authenticate(Authentication authentication)
+        throws AuthenticationException {
+        Assert.isInstanceOf(UsernamePasswordAuthenticationToken.class, authentication,
+            () -> this.messages.getMessage("AbstractUserDetailsAuthenticationProvider.onlySupports",
+                "Only UsernamePasswordAuthenticationToken is supported"));
+        String username = determineUsername(authentication);
+        boolean cacheWasUsed = true;
+        UserDetails user = this.userCache.getUserFromCache(username);
+        if (user == null) {
+            cacheWasUsed = false;
+            try {
+                user = retrieveUser(username, (UsernamePasswordAuthenticationToken) authentication);
+            } catch (UsernameNotFoundException ex) {
+                this.logger.debug("Failed to find user '" + username + "'");
+                if (!this.hideUserNotFoundExceptions) {
+                    throw ex;
+                }
+                throw new BadCredentialsException(this.messages
+                    .getMessage("AbstractUserDetailsAuthenticationProvider.badCredentials",
+                        "Bad credentials"));
+            }
+            Assert.notNull(user,
+                "retrieveUser returned null - a violation of the interface contract");
+        }
+        try {
+            this.preAuthenticationChecks.check(user);
+            additionalAuthenticationChecks(user,
+                (UsernamePasswordAuthenticationToken) authentication);
+        } catch (AuthenticationException ex) {
+            if (!cacheWasUsed) {
+                throw ex;
+            }
+            // There was a problem, so try again after checking
+            // we're using latest data (i.e. not from the cache)
+            cacheWasUsed = false;
+            user = retrieveUser(username, (UsernamePasswordAuthenticationToken) authentication);
+            this.preAuthenticationChecks.check(user);
+            additionalAuthenticationChecks(user,
+                (UsernamePasswordAuthenticationToken) authentication);
+        }
+        this.postAuthenticationChecks.check(user);
+        if (!cacheWasUsed) {
+            this.userCache.putUserInCache(user);
+        }
+        Object principalToReturn = user;
+        if (this.forcePrincipalAsString) {
+            principalToReturn = user.getUsername();
+        }
+        return createSuccessAuthentication(principalToReturn, authentication, user);
+    }
+}
+```
+  - ```DaoAuthenticationProvider```의 ```createSuccessAuthentication```호출
+  - ```AbstractUserDetailsAuthenticationProvider```을 상속받은 ```DaoAuthenticationProvider```
+```java
+public abstract class AbstractUserDetailsAuthenticationProvider
+        implements AuthenticationProvider, InitializingBean, MessageSourceAware {
+  protected Authentication createSuccessAuthentication(Object principal, Authentication authentication,
+          UserDetails user) {
+    UsernamePasswordAuthenticationToken result = new UsernamePasswordAuthenticationToken(principal,
+            authentication.getCredentials(), this.authoritiesMapper.mapAuthorities(user.getAuthorities()));
+    result.setDetails(authentication.getDetails());
+    this.logger.debug("Authenticated user");
+    return result;
+  }
+}
+```
+
+  - 다시 ```AbstractAuthenticationProcessingFilter```로 와서
+```java
+    Authentication authenticationResult = attemptAuthentication(request, response);
+```
+  - 를 반환받고(인증, 인가정보가 담긴 객체)
+  - ```successfulAuthentication```을 호출
+
+```java
+public abstract class AbstractAuthenticationProcessingFilter extends GenericFilterBean
+        implements ApplicationEventPublisherAware, MessageSourceAware {
+
+    protected void successfulAuthentication(HttpServletRequest request,
+        HttpServletResponse response, FilterChain chain,
+        Authentication authResult) throws IOException, ServletException {
+        SecurityContext context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(authResult);
+        SecurityContextHolder.setContext(context);
+        if (this.logger.isDebugEnabled()) {
+            this.logger.debug(LogMessage.format("Set SecurityContextHolder to %s", authResult));
+        }
+        this.rememberMeServices.loginSuccess(request, response, authResult);
+        if (this.eventPublisher != null) {
+            this.eventPublisher.publishEvent(
+                new InteractiveAuthenticationSuccessEvent(authResult, this.getClass()));
+        }
+        this.successHandler.onAuthenticationSuccess(request, response, authResult);
+    }
+}
+```
+  - ```onAuthenticationSuccess```를 호출
+```java
+public interface AuthenticationSuccessHandler {
+
+    default void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
+        FilterChain chain,
+        Authentication authentication) throws IOException, ServletException {
+        onAuthenticationSuccess(request, response, authentication);
+        chain.doFilter(request, response);
+    }
+}
+```

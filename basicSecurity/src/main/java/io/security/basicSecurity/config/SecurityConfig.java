@@ -16,12 +16,12 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
             .anyRequest().authenticated()
             .and()
             .formLogin()
-            .loginPage("/loginPage")
+//            .loginPage("/loginPage")
             .defaultSuccessUrl("/")
-            .failureUrl("/login")
+            .failureUrl("/login.html?error=true")
             .usernameParameter("userId")
             .passwordParameter("passwd")
-            .loginProcessingUrl("/login_proc")
+            .loginProcessingUrl("/login")
             .successHandler((request, response, authentication) -> {
                 System.out.println("authentication : " + authentication.getName());
                 response.sendRedirect("/");
