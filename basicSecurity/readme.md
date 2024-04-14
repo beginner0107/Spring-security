@@ -42,7 +42,11 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     - ```HttpSecurityConfiguration```
     - 위의 3개의 클래스를 **IMPORT**
     - 스프링 시큐리티를 활성화하고 웹 보안 설정을 구성하는데 사용
-    - 
+- 작동 원리
+  - 스프링 부트가 실행되면서 스프링 시큐리티 관련 클래스를 로드하고, ```WebSecurityConfigurerAdapter```를 수행하면서, Default Security 설정을 바탕으로 보안 활성화
+  - ```WebSecurityConfigurerAdapter```를 Override한다. (스프링의 원리가 녹아 있음)
+  - 내가 만든 ```WebSecurityConfigurerAdapter```가 수행된다.
+  - 건전지 A가 있는데, 건전지 A의 공통 기능은 그대로 수행하면서 세부 구현을 다르게 할 수 있음
 
 ### HttpSecurity
 - 세부적인 보안 기능을 설정할 수 있는 API 제공
