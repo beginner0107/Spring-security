@@ -374,3 +374,52 @@ public interface AuthenticationSuccessHandler {
     }
 }
 ```
+
+### FilterChainProxy
+- FilterChainProxy의 등록된 각각의 필터들
+
+![img.png](image/FilterChainProxy.png)
+
+```java
+public class FilterChainProxy extends GenericFilterBean {
+  private static final class VirtualFilterChain implements FilterChain {
+    private final FilterChain originalChain;
+
+    private final List<Filter> additionalFilters;
+
+    private final FirewalledRequest firewalledRequest;
+
+    private final int size;
+
+    private int currentPosition = 0;
+
+    private VirtualFilterChain(FirewalledRequest firewalledRequest, FilterChain chain,
+            List<Filter> additionalFilters) {
+      this.originalChain = chain;
+      this.additionalFilters = additionalFilters;
+      this.size = additionalFilters.size();
+      this.firewalledRequest = firewalledRequest;
+    }
+
+    @Override
+    public void doFilter(ServletRequest request, ServletResponse response) throws IOException, ServletException {
+      if (this.currentPosition == this.size) {
+        if (logger.isDebugEnabled()) {
+          logger.debug(LogMessage.of(() -> "Secured " + requestLine(this.firewalledRequest)));
+        }
+        // Deactivate path stripping as we exit the security filter chain
+        this.firewalledRequest.reset();
+        this.originalChain.doFilter(request, response);
+        return;
+      }
+      this.currentPosition++;
+      Filter nextFilter = this.additionalFilters.get(this.currentPosition - 1);
+      if (logger.isTraceEnabled()) {
+        logger.trace(LogMessage.format("Invoking %s (%d/%d)", nextFilter.getClass().getSimpleName(),
+                this.currentPosition, this.size));
+      }
+      nextFilter.doFilter(request, response, this); // 디버깅 포인트
+    }
+  }
+}
+```
