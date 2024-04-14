@@ -52,3 +52,72 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 - 세부적인 보안 기능을 설정할 수 있는 API 제공
 - 인증 API
 - 인가 API
+
+## 인증 API - Form Login 인증
+```java
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig extends WebSecurityConfigurerAdapter {
+
+  @Override
+  protected void configure(HttpSecurity http) throws Exception {
+    http
+            .authorizeRequests()
+            .anyRequest().authenticated()
+            .and()
+            .formLogin()
+            .loginPage("/loginPage")
+            .defaultSuccessUrl("/")
+            .failureUrl("/login")
+            .usernameParameter("userId")
+            .passwordParameter("passwd")
+            .loginProcessingUrl("/login_proc")
+            .successHandler((request, response, authentication) -> {
+              System.out.println("authentication : " + authentication.getName());
+              response.sendRedirect("/");
+            })
+            .failureHandler(((request, response, exception) -> {
+              System.out.println("exception " + exception.getMessage());
+              response.sendRedirect("/login");
+            }))
+            .permitAll();
+  }
+}
+```
+- ```loginPage``` 
+  - 사용자 정의 로그인 페이지
+- ```defaultSuccessUrl```
+  - 로그인 성공 후 이동 페이지
+- ```failureUrl```
+  - 로그인 실패 후 이동 페이지
+- ```usernameParameter```
+  - 아이디 파라미터명 설정
+- ```passwordParameter```
+  - 패스워드 파라미터명 설정
+- ```loginProcessingUrl```
+  - 로그인 Form Action Url
+- ```successHandler```
+  - 로그인 성공 후 핸들러
+- ```failureHandler```
+  - 로그인 실패 후 핸들러
+
+### 아이디 파라미터명 설정, 패스워드 파라미터명 설정 의미
+- 스프링 시큐리티가 만들어준 로그인 페이지에서 [아이디, 패스워드]의 기본 설정을 따르지 않고
+```html
+<div class="container">
+      <form class="form-signin" method="post" action="/login_proc">
+        <h2 class="form-signin-heading">Please sign in</h2>
+        <p>
+          <label for="username" class="sr-only">Username</label>
+          <input type="text" id="username" name="여기가 바뀜" class="form-control" placeholder="Username" required="" autofocus="">
+        </p>
+        <p>
+          <label for="password" class="sr-only">Password</label>
+          <input type="password" id="password" name="여기가 바뀜" class="form-control" placeholder="Password" required="">
+        </p>
+<input name="_csrf" type="hidden" value="fe30218b-e487-4293-a845-ddd7a975da03">
+        <button class="btn btn-lg btn-primary btn-block" type="submit">Sign in</button>
+      </form>
+</div>
+```
+- 이런 식으로 사용할 수 있음
