@@ -383,43 +383,62 @@ public interface AuthenticationSuccessHandler {
 ```java
 public class FilterChainProxy extends GenericFilterBean {
   private static final class VirtualFilterChain implements FilterChain {
-    private final FilterChain originalChain;
-
-    private final List<Filter> additionalFilters;
-
-    private final FirewalledRequest firewalledRequest;
-
-    private final int size;
-
-    private int currentPosition = 0;
-
-    private VirtualFilterChain(FirewalledRequest firewalledRequest, FilterChain chain,
-            List<Filter> additionalFilters) {
-      this.originalChain = chain;
-      this.additionalFilters = additionalFilters;
-      this.size = additionalFilters.size();
-      this.firewalledRequest = firewalledRequest;
-    }
-
     @Override
     public void doFilter(ServletRequest request, ServletResponse response) throws IOException, ServletException {
-      if (this.currentPosition == this.size) {
-        if (logger.isDebugEnabled()) {
-          logger.debug(LogMessage.of(() -> "Secured " + requestLine(this.firewalledRequest)));
-        }
-        // Deactivate path stripping as we exit the security filter chain
-        this.firewalledRequest.reset();
-        this.originalChain.doFilter(request, response);
-        return;
-      }
-      this.currentPosition++;
+      /* 생략 */  
       Filter nextFilter = this.additionalFilters.get(this.currentPosition - 1);
-      if (logger.isTraceEnabled()) {
-        logger.trace(LogMessage.format("Invoking %s (%d/%d)", nextFilter.getClass().getSimpleName(),
-                this.currentPosition, this.size));
-      }
       nextFilter.doFilter(request, response, this); // 디버깅 포인트
     }
   }
 }
 ```
+
+## 인증 API - Logout
+
+```java
+        http.logout()
+            .logoutUrl("/logout")
+            .logoutSuccessUrl("/login")
+            .deleteCookies("JSESSIONID", "remember-me")
+            .addLogoutHandler((request, response, authentication) -> {
+                HttpSession session = request.getSession();
+                session.invalidate();
+            })
+            .logoutSuccessHandler(
+                (request, response, authentication) -> response.sendRedirect("/login"));
+```
+- ```http.logout()```
+  - 로그아웃 기능이 작동함
+- ```logoutUrl ```
+  - 로그아웃 처리 URL
+- ```logoutSuccessUrl```
+  - 로그아웃 성공 후 이동페이지
+- ```deleteCookies("JSESSIONID", "remember-me")```
+  - 로그아웃 후 쿠키 삭제
+- ```addLogoutHandler(logoutHandler())```
+  - 로그아웃 핸들러
+  - 기본적으로 스프링 시큐리티가 로그아웃 시 제공하는 구현체가 있음
+  - 세션 삭제, 인증 토큰 삭제(기본 제공)
+  - 그 외로 로그아웃이 이루어 졌을 때, 추가적으로 하고 싶은 작업이 있을 경우 커스텀해서 사용
+- ```logoutSuccessHandler(logoutSuccessHandler())```
+  - 로그아웃 성공 후 핸들러
+  - 로그아웃이 성공적으로 수행된 후 실행될 핸들러
+### 도식화
+![img.png](image/logoutFilter.png)
+
+- ```LogoutFilter```
+  - 요청을 받아서 기본 설정 -> POST
+  - ```AntPathRequestMatcher```에게 넘김
+- ```AntPathRequestMatcher```
+  - "/설정한 URL"로 요청이 왔는지 확인
+  - URL과 일치하지 않으면, 다음 필터로 넘어가면서 로그아웃에 실패
+- ```Authentication```
+  - ```SecurityContext```의 인증 객체를 가지고 와서 ```LogoutHandler```에게 넘김
+- ```SecurityContextLogoutHandler```
+  - ```LogoutHandler``` 구현체
+  - 세션을 무효화
+  - 쿠키 삭제
+  - SecurityContextHolder.clearContext() -> 인증 객체(Authentication) 삭제
+- ```SimpleUrlLogoutSuccessHandler```
+  - 로그아웃에 성공한 ```LogoutFilter```는 ```SimpleUrlLogoutSuccessHandler```를 호출한다.
+  - 로그인 페이지로 redirect
