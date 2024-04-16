@@ -467,3 +467,35 @@ public class FilterChainProxy extends GenericFilterBean {
   - default는 14일
 - ```userDetailsService```
   - 시스템에 있는 사용자 계정을 조회하는 처리과정에 필요한 클래스 등록
+
+
+### RememberMeAuthenticationFilter
+![img.png](image/remembermeAuthenticationFilter.png)
+
+- ```RememberMeAuthenticationFilter```
+  - SecurityContext의 인증 객체가 없는 경우 작동
+  - Session이 만료, 비활성화 되었을 경우 -> rememberMeToken을 가져오는 경우 작동
+- ```RmemeberMeServices```
+  - 두개의 구현체
+    - ```TokenBasedRememberMeServices```
+      - 메모리에서 토큰을 저장한 것과 사용자가 요청을 할 때 가지고 온 쿠키(토큰)과 비교해서 인증 처리
+      - 기본 14일 만료 기간
+    - ```PersistentTokenBasedRememberMeServices```
+      - DB에 서비스에서 발급할 토큰을 저장하고
+      - 그 토큰을 클라이언트에서 가지고 온 쿠키(토큰)과 비교해서 인증 처리
+  - Token Cookie를 추출
+  - Token이 존재할 경우
+  - Decode Token -> 정상 유무를 판단
+    - 정상이 아닐 경우 예외
+  - 토큰의 값이 일치하는지 확인
+    - 일치하지 않을 경우 예외
+  - User 계정이 존재하는지 확인
+    - DB에 저장된 유저를 조회해서, 존재하게 되면 다음 단계로
+  - 새로운 ```Authentication``` 생성
+  - ```AuthenticationManager```에게 인증객체를 넘겨주면서 인증 처리
+
+### RememberMeAuthenticationFilter 요약
+1. 이 필터는 rememberMe 기능을 체크했을 때 타게된다.
+2. 세션안에 SecurityContext가 존재하는 것
+3. 세션이 만료되었을 경우 rememberMeToken을 이용해서 인증을 수행
+4. 어찌보면, JWT의 refreshToken과 유사한 점이 있음
