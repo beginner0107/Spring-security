@@ -499,3 +499,14 @@ public class FilterChainProxy extends GenericFilterBean {
 2. 세션안에 SecurityContext가 존재하는 것
 3. 세션이 만료되었을 경우 rememberMeToken을 이용해서 인증을 수행
 4. 어찌보면, JWT의 refreshToken과 유사한 점이 있음
+
+
+## AnonymousAuthenticationFilter
+![img.png](image/AnonymousAuthenticationFilter.png)
+
+- 익명사용자 인증 처리 필터
+- 익명사용자와 인증 사용자를 구분해서 처리하기 위한 용도로 사용
+- 화면에서 인증 여부를 구현할 때 isAnonymous()와 isAuthenticated() 로 구분해서 사용
+  - isAnonymous() = true -> 로그인 페이지 보여줌
+  - isAuthentication() = true -> 로그아웃 표시
+- 인증객체를 세션에 저장하지 않는다.
