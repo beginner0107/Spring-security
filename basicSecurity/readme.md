@@ -442,3 +442,28 @@ public class FilterChainProxy extends GenericFilterBean {
 - ```SimpleUrlLogoutSuccessHandler```
   - 로그아웃에 성공한 ```LogoutFilter```는 ```SimpleUrlLogoutSuccessHandler```를 호출한다.
   - 로그인 페이지로 redirect
+
+## 인증 API - Remember Me 인증
+1. 세션이 만료되고 웹 브라우저가 종료된 후에도 어플리케이션이 사용자를 기억하는 기능
+2. Remember-Me 쿠키에 대한 Http 요청을 확인한 후 토큰 기반 인증을 사용해 유효성을 검사하고 토큰이 검증되면 사용자는 로그인된다.
+3. 사용자 라이프 사이클
+   - 인증 성공(Remember-Me쿠키 설정)
+   - 인증 실패(쿠키가 존재하면 쿠키 무효화)
+   - 로그아웃(쿠키가 존재하면 쿠키 무효화)
+
+```java
+        http.rememberMe()
+            .rememberMeParameter("remember")
+            .tokenValiditySeconds(3600)
+            .alwaysRemember(true) 
+            .userDetailsService(userDetailsService);
+```
+
+- ```rememberMe()```
+  - rememberMe 기능 활성화
+- ```rememberMeParameter("remember")```
+  - 기본 파라미터명은 remember-me
+- ```totkenValiditySeconds(3600)```
+  - default는 14일
+- ```userDetailsService```
+  - 시스템에 있는 사용자 계정을 조회하는 처리과정에 필요한 클래스 등록
