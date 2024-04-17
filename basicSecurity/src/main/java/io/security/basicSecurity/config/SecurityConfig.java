@@ -54,5 +54,12 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
             .tokenValiditySeconds(3600) // Default 는 14일
             .alwaysRemember(true) // 리멤버 미 기능이 활성화되지 않아도 항상 실행 -> 기본 false
             .userDetailsService(userDetailsService); // 시스템에 있는 사용자 계정을 조회하는 처리과정에 필요한 클래스 등록
+
+        http.sessionManagement()
+//            .invalidSessionUrl("/invalid")
+            .sessionFixation().changeSessionId()
+            .maximumSessions(1)
+            .maxSessionsPreventsLogin(false);
+//            .expiredUrl("/expired");
     }
 }

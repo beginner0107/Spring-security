@@ -510,3 +510,94 @@ public class FilterChainProxy extends GenericFilterBean {
   - isAnonymous() = true -> 로그인 페이지 보여줌
   - isAuthentication() = true -> 로그아웃 표시
 - 인증객체를 세션에 저장하지 않는다.
+
+## 인증 API - 동시 세션 제어
+
+1. 이전 사용자 세션 만료
+   - A 유저가 Chrome에서 아이디와 비밀번호를 입력하여 로그인을 수행한다.
+   - A 유저가 Edge에서 아이디와 비밀번호를 입력하여 로그인을 수행한다.
+   - Chrome에서 발급된 세션은 Edge에서 로그인을 성공하면 이전 사용자 세션은 만료되게 된다.
+   - Chrome에서 사용하던 계정은 만료가 되고, Edge에서는 문제 없이 사용할 수 있다.
+
+2. 현재 사용자 인증 실패
+  - A 유저가 Chrome에서 아이디와 비밀번호를 입력하여 로그인을 수행한다.
+  - A 유저가 Edge에서 아이디와 비밀번호를 입력한다.
+  - Edge에서 로그인을 수행함과 동시에 인증 예외가 발생한다.
+  - Chrome에서 발급받은 세션을 그대로 유지하면서 서비스를 이용할 수 있다.
+
+```java
+.invalidSessionUrl("/invalid")
+.maximumSessions(1)
+.maxSessionsPreventsLogin(true)
+.expiredUrl("/expired");
+```
+
+- ```invalidSessionUrl("/URL")```
+  - 세션이 유효하지 않을 때 이동할 페이지
+- ```maximumSessions(최대허용가능세션수)```
+  - 최대 허용 가능 세션수
+  - -1이면 무제한 로그인 세션을 허용한다.
+- ```maxSessionsPreventsLogin```
+  - true -> 동시 로그인을 차단 -> 2번 케이스
+  - false -> 기존 세션을 만료시키는 방법 -> 1번 케이스(default)
+- ```expiredUrl("/URL")```
+  - 세션이 만료된 경우 이동 할 페이지
+  - ```invalidSessionUrl```이 먼저 선언되어 있으면 우선순위에서 밀려 수행되지 않는다.
+  - 두 메서드를 같이 쓰는 것은 ```expiredUrl```에게는 의미가 없다.
+
+## 인증 API - 세션 고정 보호
+- a라는 헤커가 b라는 서버에게 c라는 session을 발급받는다.(인증 성공)
+- a(해커)는 d라는 유저에게 서버에서 발급받은 session을 건네주고
+- d라는 유저는 서버에서 발급받은 c라는 세션을 가지고 b라는 서버에 접속할 수 있게 된다.
+- 하나의 세션으로 두 명의 유저가 존재하는 것
+- 사용자가 로그인을 시도했을 때, 세션 값을 새로 발급해주지 않는다면 생길 일
+
+```java
+http.sessionManagement()
+    .sessionFixation().changeSessionId()
+```
+- changeSessionId()는 Servlet 3.1 이상에서 기본 값
+- migrateSession은 Servlet 3.1 이하에서 작동하도록 기본 값으로 설정되어 있음 -> 이전의 속성 값을 그대로 재사용
+- newSession은 세션이 발급되고 재 세션도 발급되지만 이전의 세션에서 설정한 여러가지 속성의 값들을 사용하지 못하고 새롭게 속성을 설정해야 함
+- none 가장 취약한 설정 - 세션공격에 취약
+
+```java
+public SessionManagementConfigurer<H> newSession() {
+    SessionFixationProtectionStrategy sessionFixationProtectionStrategy = new SessionFixationProtectionStrategy();
+    sessionFixationProtectionStrategy.setMigrateSessionAttributes(false);
+    setSessionFixationAuthenticationStrategy(sessionFixationProtectionStrategy);
+    return SessionManagementConfigurer.this;
+}
+
+public SessionManagementConfigurer<H> migrateSession() {
+    setSessionFixationAuthenticationStrategy(new SessionFixationProtectionStrategy());
+    return SessionManagementConfigurer.this;
+}
+
+public SessionManagementConfigurer<H> changeSessionId() {
+    setSessionFixationAuthenticationStrategy(new ChangeSessionIdAuthenticationStrategy());
+    return SessionManagementConfigurer.this;
+}
+
+public SessionManagementConfigurer<H> none() {
+    setSessionFixationAuthenticationStrategy(new NullAuthenticatedSessionStrategy());
+    return SessionManagementConfigurer.this;
+}
+```
+
+## 인증 API - 세션 정책
+```java
+http.sessionManagement()
+        .sessionCreationPolicy(SessionCreationPolicy.If_Required)
+```
+- ```sessionCreationPolicy()```
+  - 세션 관리 기능이 작동함
+
+1. ```SessionCreationPolicy.Always```
+  - 스프링 시큐리티가 항상 세션 생성
+2. ```SessionCreationPolicy.If_Required```
+  - 스프링 시큐리티가 필요 시 생성(기본값) 
+3. ```SessionCreationPolicy.Never```
+  - 스프링 시큐리티가 생성하지 않지만 이미 존재하면 사용
+4. ```SessionCreationPolicy.Stateless```
+  - 스프링 시큐리티가 생성하지 않고 존재해도 사용하지 않음
