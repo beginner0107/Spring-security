@@ -1,13 +1,24 @@
 package io.security.basicSecurity.config;
 
+import java.io.IOException;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
+import org.springframework.security.web.savedrequest.RequestCache;
+import org.springframework.security.web.savedrequest.SavedRequest;
 
 @Configuration
 @EnableWebSecurity
@@ -37,8 +48,11 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
             .passwordParameter("passwd")
             .loginProcessingUrl("/login")
             .successHandler((request, response, authentication) -> {
+                RequestCache requestCache = new HttpSessionRequestCache();
+                SavedRequest savedRequest = requestCache.getRequest(request, response);
+                String redirectUrl = savedRequest.getRedirectUrl(); // 원래 사용자가 가고 싶어하던 경로를 추출할 수 있음
                 System.out.println("authentication : " + authentication.getName());
-                response.sendRedirect("/");
+                response.sendRedirect(redirectUrl);
             })
             .failureHandler(((request, response, exception) -> {
                 System.out.println("exception " + exception.getMessage());
@@ -72,9 +86,28 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
         http
             .authorizeRequests()
+            .antMatchers("/login").permitAll()
             .antMatchers("/user").hasRole("USER")
             .antMatchers("/admin/pay").hasRole("ADMIN")
             .antMatchers("/admin/**").access("hasRole('ADMIN') or hasRole('SYS')")
             .anyRequest().authenticated();
+
+        http
+            .exceptionHandling()
+            .authenticationEntryPoint(new AuthenticationEntryPoint() {
+                @Override
+                public void commence(HttpServletRequest request, HttpServletResponse response,
+                    AuthenticationException authException) throws IOException, ServletException {
+                    response.sendRedirect("/login");
+                }
+            })
+            .accessDeniedHandler(new AccessDeniedHandler() {
+                @Override
+                public void handle(HttpServletRequest request, HttpServletResponse response,
+                    AccessDeniedException accessDeniedException)
+                    throws IOException, ServletException {
+                    response.sendRedirect("/denied");
+                }
+            });
     }
 }
