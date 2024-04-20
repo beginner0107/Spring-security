@@ -617,3 +617,48 @@ http.sessionManagement()
 - 매 요청 마다 현재 사용자의 세션 만료 여부 체크
 - 세션이 만료되었을 경우 즉시 만료 처리
 
+## 인가 API - 권한 설정
+
+- 선언적 방식
+  - URL
+    - ```http.antMatchers("/users/**").hasRole("USER")```
+  - Method
+    - ```@PreAuthorize("hasRole('USER')")```
+    - public void user() {System.out.println("user")}
+
+- 동적 방식 - DB 연동 프로그래밍
+  - URL
+  - Method
+
+
+### 선언적 방식
+
+```java
+http
+  .antMatcher("/shop/**")
+  .authorizeRequests()
+  .antMatchers("/shop/login", "/shop/users/**").permitAll()
+  .antMatchers("/shop/mypage").hasRole("USER")
+  .antMatchers("/shop/admin/pay").access("hasRole('ADMIN')")
+  .antMatchers("/shop/admin/**").access("hasRole('ADMIN') or hasRole('SYS')")
+  .anyRequest().authenticated();
+```
+
+- 주의 사항
+  - 설정 시 구체적인 경로가 먼저 오고 그것 보다 큰 범위의 경로가 뒤에 오도록 해야 한다.
+
+## 인가 API - 표현식
+| 메소드                     | 동작                                 |
+|-------------------------|------------------------------------|
+| authenticated()         | 인증된 사용자의 접근을 허용                    |
+| fullyAuthenticated()    | 인증된 사용자의 접근을 허용, rememberMe 인증 제외  |
+| permitAll()             | 무조건 접근을 허용                         |
+| denyAll()               | 무조건 접근을 허용하지 않음                    |
+| anonymous()             | 익명사용자의 접근을 허용                      |
+| rememberMe()            | 기억하기를 통해 인증된 사용자의 접근을 허용           |
+| access(String)          | 주어진 SpEL 표현식의 평과 결과가 true이면 접근을 허용 |
+| hasRole(String)         | 사용자가 주어진 역할이 있다면 접근을 허용            |
+| hasAuthorities(String)  | 사용자가 주어진 권한이 있다면                   |
+| hasAnyRole(String)      | 사용자가 주어진 권한이 있다면 접근을 허용            |
+| hasAnyAuthority(String) | 사용자가 주어진 권한 중 어떤 것이라도 있다면 접근을 허용   |
+| hasIpAddress(String)    | 주어진 IP로부터 요청이 왔다면 접근을 허용           |
