@@ -740,3 +740,45 @@ http.csrf().disabled();
 6. 마지막 필터까지 인증 및 인가 예외가 발생하지 않으면 보안 통과
 
 ![img.png](image/DelegatingFilterProxy.png)
+
+
+## ```Authentication```
+
+### ```Authentication``` 객체에 대해
+- 사용자의 인증정보를 저장하는 토큰 개념
+- 인증 시 id와 password를 담고 인증 검증을 위해 전달되어 사용된다
+- 인증 후 최종 인증 결과 (user객체, 권한정보) 를 담고 SecurityContext에 저장되어 전역적으로 참조가 가능하다.
+  - ```Authentication authentication = SecurityContextHolder.getContext().getAuthentication()```
+
+- 구조
+  1. ```principal``` : 사용자의 아이디 혹은 User 객체를 저장
+  2. ```credentials``` : 사용자 비밀번호
+  3. ```authorities``` : 인증된 사용자의 권한 목록
+  4. ```details``` : 인증 부가 정보
+  5. ```Authenticated``` : 인증 여부
+
+## ```SecurityContextHolder```, ```SecurityContext```
+
+### ```SecurityContext```
+- ```Authentication``` 객체가 저장되는 보관소로 필요 시 언제든지 ```Authentication``` 객체를 꺼내어 쓸 수 있도록 제공되는 클래스
+- ```ThreadLocal``` 에 저장되어 아무 곳에서나 참조가 가능하도록 설계함
+- 인증이 완료되면 ```HttpSession```에 저장되어 어플리케이션 전반에 걸쳐 전역적인 참조가 가능하다
+
+### ```SecurityContextHolder```
+- ```SecurityContext``` 객체 저장방식
+  - ```MODE_THREADLOCAL```: 스레드당 SecurityContextHolder 객체를 할당, 기본값
+  - ```MODE_GLOBAL```: 응용 프로그램에서 단 하나의 SecurityContext를 저장한다.
+- ```SecurityContextHolder.clearContext()```: SecurityContext 기존 정보 초기화
+
+![img.png](image/SecurityContext.png)
+
+1. 사용자가 로그인을 시도
+2. 서버에서 하나의 스레드를 생성 (ThreadLocal: 스레드 전역저장소)
+3. 인증 처리(인증 필터)
+   - 실패 -> SecurityContextHolder.clearContext()
+   - 성공 -> SecurityContextHolder 안의 SecurityContext에 최종적으로 인증에 성공한 인증객체를 담는다.
+4. 인증 객체를 담고 최종적으로 HttpSession에 저장
+   - "SPRING_SECURITY_CONTEXT" 라는 이름으로
+```java
+private String springSecurityContextKey = SPRING_SECURITY_CONTEXT_KEY;
+```
