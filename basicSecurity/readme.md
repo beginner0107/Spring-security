@@ -689,3 +689,32 @@ http.exceptionHandling()
   - 인증 실패 시 처리
 - ```.accessDeniedHandler(accessDeniedHandler())```
   - 인가 실패 시 처리
+
+
+## Form 인증 - CsrfFilter
+- 모든 요청에 랜덤하게 생성된 토큰을 HTTP 파라미터로 요구
+- 요청 시 전달되는 토큰 값과 서버에 저장된 실제 값과 비교한 후 만약 일치하지 않으면 요청은 실패한다.
+
+- Client
+```html
+<input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+```
+- HTTP 메소드 : PATCH, POST, PUT< DELETE
+
+- Spring Security
+```java
+http.csrf();
+http.csrf().disabled();
+```
+- ```http.csrf()```
+  - 기본 활성화되어 있음
+- ```http.csrf().disabled()```
+  - 비활성화
+
+### 예시
+1. 사용자가 A라는 뱅킹 웹 사이트에 로그인하여 세션을 시작(인증, 인가 O)
+2. 사용자가 A 웹 사이트를 닫지 않고, 새 탭에서 공격자가 만든 웹 사이트 B에 접속(방법은 이메일 등등)
+3. B에는 ```<img src="http://bbbb.com/transfer?to=attacker&amount=1000">```이라는 코드가 있음
+4. 사용자는 이 이미지를 클릭하는 동시에 A서버(웹사이트)에게 요청을 보냄
+5. A사이트는 인증/인가가 성공한 사용자의 쿠키를 받아 요청을 처리하게 됨(사용자가 보낸 것처럼 보임)
+6. attacker의 계좌로 1000달러가 이체되는 현상
