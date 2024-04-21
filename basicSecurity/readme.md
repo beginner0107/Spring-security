@@ -699,7 +699,7 @@ http.exceptionHandling()
 ```html
 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
 ```
-- HTTP 메소드 : PATCH, POST, PUT< DELETE
+- HTTP 메소드 : PATCH, POST, PUT, DELETE
 
 - Spring Security
 ```java
@@ -718,3 +718,25 @@ http.csrf().disabled();
 4. 사용자는 이 이미지를 클릭하는 동시에 A서버(웹사이트)에게 요청을 보냄
 5. A사이트는 인증/인가가 성공한 사용자의 쿠키를 받아 요청을 처리하게 됨(사용자가 보낸 것처럼 보임)
 6. attacker의 계좌로 1000달러가 이체되는 현상
+
+
+## 위임 및 필터 빈 초기화
+- ```DelegatingFilterProxy```
+  - 서블릿 필터는 스프링에서 정의된 빈을 주입해서 사용할 수 없음
+  - 특정한 이름을 가진 스프링 빈을 찾아 그 빈에게 요청을 위임
+    - ```springSecurityFilterChain``` 이름으로 생성된 빈을 ```ApplicationContext``` 에서 찾아 요청을 위임
+    - 실제 보안처리를 하지 않음
+
+![img.png](image/FilterChainProxy.png)
+
+1. ```springSecurityFilterChain``` 의 이름으로 생성되는 필터 빈
+2. ```DelegatingFilterProxy``` 으로 부터 요청을 위임 받고 실제 보안 처리
+3. 스프링 시큐리티 초기화 시 생성되는 필터들을 관리하고 제어
+  - 스프링 시큐리티가 기본적으로 생성하는 필터
+  - 설정 클래스에서 API 추가 시 생성되는 필터
+4. 사용자의 요청을 필터 순서대로 호출하여 전달
+5. 사용자정의 필터를 생성해서 기존의 필터 전,후로 추가 가능
+  - 필터의 순서를 잘 정의
+6. 마지막 필터까지 인증 및 인가 예외가 발생하지 않으면 보안 통과
+
+![img.png](image/DelegatingFilterProxy.png)
